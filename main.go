@@ -377,7 +377,7 @@ func main() {
 	)
 	correct = 0
 	for _, value := range iris {
-		samples := make([]float64, 0, 8)
+		samples := NewMatrix(3, iterations)
 		for j := 0; j < iterations; j++ {
 			transform := NewMatrix(4, 4)
 			for k := 0; k < 4; k++ {
@@ -408,23 +408,23 @@ func main() {
 				input[j] = out.Data[j]
 			}
 			l2(func(a *tf64.V) bool {
-				samples = append(samples, a.X...)
+				samples.Data = append(samples.Data, a.X...)
 				return true
 			})
 		}
-		average := make([]float64, 3)
+		average := make([]float64, samples.Cols)
 		for j := 0; j < iterations; j++ {
-			for k := 0; k < 3; k++ {
-				average[k] += samples[j*3+k]
+			for k := 0; k < samples.Cols; k++ {
+				average[k] += samples.Data[j*samples.Cols+k]
 			}
 		}
 		for j := range average {
 			average[j] /= iterations
 		}
-		variance := make([]float64, 3)
+		variance := make([]float64, samples.Cols)
 		for j := 0; j < iterations; j++ {
-			for k := 0; k < 3; k++ {
-				diff := average[k] - samples[j*3+k]
+			for k := 0; k < samples.Cols; k++ {
+				diff := average[k] - samples.Data[j*samples.Cols+k]
 				variance[k] += diff * diff
 			}
 		}

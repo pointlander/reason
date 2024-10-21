@@ -41,6 +41,55 @@ const (
 	StateTotal
 )
 
+// Matrix is a float64 matrix
+type Matrix struct {
+	Cols int
+	Rows int
+	Data []float64
+}
+
+// NewMatrix creates a new float64 matrix
+func NewMatrix(cols, rows int, data ...float64) Matrix {
+	if data == nil {
+		data = make([]float64, 0, cols*rows)
+	}
+	return Matrix{
+		Cols: cols,
+		Rows: rows,
+		Data: data,
+	}
+}
+
+// Dot computes the dot product
+func Dot(x, y []float64) (z float64) {
+	for i := range x {
+		z += x[i] * y[i]
+	}
+	return z
+}
+
+// MulT multiplies two matrices and computes the transpose
+func (m Matrix) MulT(n Matrix) Matrix {
+	if m.Cols != n.Cols {
+		panic(fmt.Errorf("%d != %d", m.Cols, n.Cols))
+	}
+	columns := m.Cols
+	o := Matrix{
+		Cols: m.Rows,
+		Rows: n.Rows,
+		Data: make([]float64, 0, m.Rows*n.Rows),
+	}
+	lenn, lenm := len(n.Data), len(m.Data)
+	for i := 0; i < lenn; i += columns {
+		nn := n.Data[i : i+columns]
+		for j := 0; j < lenm; j += columns {
+			mm := m.Data[j : j+columns]
+			o.Data = append(o.Data, Dot(mm, nn))
+		}
+	}
+	return o
+}
+
 //go:embed iris.zip
 var Iris embed.FS
 
@@ -259,6 +308,66 @@ func main() {
 			}
 			return true
 		})
+	}
+	fmt.Println("correct", correct, float64(correct)/float64(len(iris)))
+
+	const (
+		iterations = 1024
+	)
+	correct = 0
+	for _, value := range iris {
+		samples := make([]float64, 0, 8)
+		for j := 0; j < iterations; j++ {
+			transform := NewMatrix(4, 4)
+			for k := 0; k < 4; k++ {
+				for l := 0; l < 4; l++ {
+					if k == l {
+						transform.Data = append(transform.Data, 1)
+					} else {
+						transform.Data = append(transform.Data, rng.NormFloat64()/8)
+					}
+				}
+			}
+			in := NewMatrix(4, 1)
+			for k := 0; k < 4; k++ {
+				in.Data = append(in.Data, value.Measures[k])
+			}
+			out := transform.MulT(in)
+			input := others.ByName["input"].X
+			for j := range input {
+				input[j] = out.Data[j]
+			}
+			l2(func(a *tf64.V) bool {
+				samples = append(samples, a.X...)
+				return true
+			})
+		}
+		average := make([]float64, 3)
+		for j := 0; j < iterations; j++ {
+			for k := 0; k < 3; k++ {
+				average[k] += samples[j*3+k]
+			}
+		}
+		for j := range average {
+			average[j] /= iterations
+		}
+		variance := make([]float64, 3)
+		for j := 0; j < iterations; j++ {
+			for k := 0; k < 3; k++ {
+				diff := average[k] - samples[j*3+k]
+				variance[k] += diff * diff
+			}
+		}
+
+		max, index := 0.0, 0
+		for j, v := range variance {
+			if v > max {
+				max, index = v, j
+			}
+		}
+		if index == Labels[value.Label] {
+			correct++
+		}
 	}
 	fmt.Println("correct", correct, float64(correct)/float64(len(iris)))
 }

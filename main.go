@@ -367,6 +367,10 @@ func main() {
 				variance[k] += diff * diff
 			}
 		}
+		for j := range variance {
+			variance[j] /= iterations
+			variance[j] = math.Sqrt(variance[j])
+		}
 
 		input := others.ByName["input"].X
 		for j := range input {

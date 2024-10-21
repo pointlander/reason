@@ -320,11 +320,20 @@ func main() {
 		for j := 0; j < iterations; j++ {
 			transform := NewMatrix(4, 4)
 			for k := 0; k < 4; k++ {
+				sum := 1.0
+				s := make([]float64, 3)
+				for l := range s {
+					v := rng.NormFloat64() / 8
+					sum -= v
+					s[l] = v
+				}
+				index := 0
 				for l := 0; l < 4; l++ {
 					if k == l {
-						transform.Data = append(transform.Data, 1)
+						transform.Data = append(transform.Data, sum)
 					} else {
-						transform.Data = append(transform.Data, rng.NormFloat64()/8)
+						transform.Data = append(transform.Data, s[index])
+						index++
 					}
 				}
 			}

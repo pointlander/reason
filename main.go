@@ -368,10 +368,11 @@ func main() {
 			}
 		}
 
-		max, index := 0.0, 0
+		min, index := math.MaxFloat64, 0
 		for j, v := range variance {
-			if v > max {
-				max, index = v, j
+			v /= average[j]
+			if v < min {
+				min, index = v, j
 			}
 		}
 		if index == Labels[value.Label] {

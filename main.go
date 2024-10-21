@@ -368,16 +368,23 @@ func main() {
 			}
 		}
 
-		min, index := math.MaxFloat64, 0
-		for j, v := range variance {
-			v /= average[j]
-			if v < min {
-				min, index = v, j
+		input := others.ByName["input"].X
+		for j := range input {
+			input[j] = value.Measures[j]
+		}
+		l2(func(a *tf64.V) bool {
+			min, index := math.MaxFloat64, 0
+			for j, v := range variance {
+				v /= a.X[j]
+				if v < min {
+					min, index = v, j
+				}
 			}
-		}
-		if index == Labels[value.Label] {
-			correct++
-		}
+			if index == Labels[value.Label] {
+				correct++
+			}
+			return true
+		})
 	}
 	fmt.Println("correct", correct, float64(correct)/float64(len(iris)))
 }

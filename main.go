@@ -24,6 +24,8 @@ import (
 )
 
 const (
+	// S is the scaling factor for the softmax
+	S = 1.0 - 1e-300
 	// B1 exponential decay of the rate for the first moment estimates
 	B1 = 0.8
 	// B2 exponential decay rate for the second-moment estimates
@@ -86,6 +88,65 @@ func (m Matrix) MulT(n Matrix) Matrix {
 			mm := m.Data[j : j+columns]
 			o.Data = append(o.Data, Dot(mm, nn))
 		}
+	}
+	return o
+}
+
+// T tramsposes a matrix
+func (m Matrix) T() Matrix {
+	o := Matrix{
+		Cols: m.Rows,
+		Rows: m.Cols,
+		Data: make([]float64, 0, m.Cols*m.Rows),
+	}
+	for i := 0; i < m.Cols; i++ {
+		for j := 0; j < m.Rows; j++ {
+			o.Data = append(o.Data, m.Data[j*m.Cols+i])
+		}
+	}
+	return o
+}
+
+func softmax(values []float64) {
+	max := float64(0.0)
+	for _, v := range values {
+		if v > max {
+			max = v
+		}
+	}
+	s := max * S
+	sum := float64(0.0)
+	for j, value := range values {
+		values[j] = float64(math.Exp(float64(value - s)))
+		sum += values[j]
+	}
+	for j, value := range values {
+		values[j] = value / sum
+	}
+}
+
+// SelfAttention computes the self attention of Q, K, V
+func SelfAttention(Q, K, V Matrix) Matrix {
+	o := Matrix{
+		Cols: V.Cols,
+		Rows: K.Rows,
+		Data: make([]float64, 0, V.Rows*K.Rows),
+	}
+	outputs, values := make([]float64, V.Cols), make([]float64, Q.Rows)
+	V = V.T()
+	for i := 0; i < K.Rows; i++ {
+		K := K.Data[i*K.Cols : (i+1)*K.Cols]
+		for j := 0; j < Q.Rows; j++ {
+			Q := Q.Data[j*Q.Cols : (j+1)*Q.Cols]
+			values[j] = Dot(K, Q)
+		}
+		softmax(values)
+
+		for j := 0; j < V.Rows; j++ {
+			V := V.Data[j*V.Cols : (j+1)*V.Cols]
+			outputs[j] = Dot(values, V)
+		}
+		o.Data = append(o.Data, outputs...)
 	}
 	return o
 }

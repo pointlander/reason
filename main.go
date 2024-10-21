@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"embed"
 	"encoding/csv"
+	"fmt"
 	"io"
 	"math"
 	"math/rand"
@@ -239,4 +240,25 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	correct := 0
+	for _, value := range iris {
+		input := others.ByName["input"].X
+		for j := range input {
+			input[j] = value.Measures[j]
+		}
+		l2(func(a *tf64.V) bool {
+			max, index := 0.0, 0
+			for j, v := range a.X {
+				if v > max {
+					max, index = v, j
+				}
+			}
+			if index == Labels[value.Label] {
+				correct++
+			}
+			return true
+		})
+	}
+	fmt.Println("correct", correct, float64(correct)/float64(len(iris)))
 }

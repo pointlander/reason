@@ -376,6 +376,7 @@ func main() {
 		iterations = 1024
 	)
 	correct = 0
+	correct1 := 0
 	for _, value := range iris {
 		samples := NewMatrix(3, iterations)
 		for j := 0; j < iterations; j++ {
@@ -450,6 +451,29 @@ func main() {
 			}
 			return true
 		})
+
+		sa := SelfAttention(samples, samples, samples)
+		votes := make([]int, sa.Cols)
+		for j := 0; j < sa.Rows; j++ {
+			max, index := 0.0, 0
+			for k := 0; k < sa.Cols; k++ {
+				v := sa.Data[j*sa.Cols+k]
+				if v > max {
+					max, index = v, k
+				}
+			}
+			votes[index]++
+		}
+		max, index := 0, 0
+		for i, v := range votes {
+			if v > max {
+				max, index = v, i
+			}
+		}
+		if index == Labels[value.Label] {
+			correct1++
+		}
 	}
-	fmt.Println("correct", correct, float64(correct)/float64(len(iris)))
+	fmt.Println("raw correct", correct, float64(correct)/float64(len(iris)))
+	fmt.Println("self attention correct", correct1, float64(correct1)/float64(len(iris)))
 }

@@ -219,7 +219,7 @@ func Load() []Fisher {
 }
 
 const (
-	iterations = 2 * 1024
+	iterations = 1024
 )
 
 // Sample samples the neural network
@@ -421,6 +421,8 @@ func main() {
 	correct2 := 0
 	for _, value := range iris {
 		samples := Sample(value, &others, l2, rng)
+		samples1 := Sample(value, &others, l2, rng)
+		samples2 := Sample(value, &others, l2, rng)
 
 		average := make([]float64, samples.Cols)
 		for j := 0; j < iterations; j++ {
@@ -461,7 +463,7 @@ func main() {
 			return true
 		})
 
-		sa := SelfAttention(samples, samples, samples)
+		sa := SelfAttention(samples, samples1, samples2)
 		votes := make([]int, sa.Cols)
 		for j := 0; j < sa.Rows; j++ {
 			max, index := 0.0, 0

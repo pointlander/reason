@@ -218,6 +218,50 @@ func Load() []Fisher {
 	return fisher
 }
 
+const (
+	iterations = 2 * 1024
+)
+
+// Sample samples the neural network
+func Sample(value Fisher, others *tf64.Set, l2 tf64.Meta, rng *rand.Rand) Matrix {
+	samples := NewMatrix(3, iterations)
+	for j := 0; j < iterations; j++ {
+		transform := NewMatrix(4, 4)
+		for k := 0; k < 4; k++ {
+			sum := 1.0
+			s := make([]float64, 3)
+			for l := range s {
+				v := rng.NormFloat64() / 8
+				sum -= v
+				s[l] = v
+			}
+			index := 0
+			for l := 0; l < 4; l++ {
+				if k == l {
+					transform.Data = append(transform.Data, sum)
+				} else {
+					transform.Data = append(transform.Data, s[index])
+					index++
+				}
+			}
+		}
+		in := NewMatrix(4, 1)
+		for k := 0; k < 4; k++ {
+			in.Data = append(in.Data, value.Measures[k])
+		}
+		out := transform.MulT(in)
+		input := others.ByName["input"].X
+		for j := range input {
+			input[j] = out.Data[j]
+		}
+		l2(func(a *tf64.V) bool {
+			samples.Data = append(samples.Data, a.X...)
+			return true
+		})
+	}
+	return samples
+}
+
 func main() {
 	rng := rand.New(rand.NewSource(1))
 	iris := Load()
@@ -372,48 +416,12 @@ func main() {
 	}
 	fmt.Println("correct", correct, float64(correct)/float64(len(iris)))
 
-	const (
-		iterations = 2 * 1024
-	)
 	correct = 0
 	correct1 := 0
 	correct2 := 0
 	for _, value := range iris {
-		samples := NewMatrix(3, iterations)
-		for j := 0; j < iterations; j++ {
-			transform := NewMatrix(4, 4)
-			for k := 0; k < 4; k++ {
-				sum := 1.0
-				s := make([]float64, 3)
-				for l := range s {
-					v := rng.NormFloat64() / 8
-					sum -= v
-					s[l] = v
-				}
-				index := 0
-				for l := 0; l < 4; l++ {
-					if k == l {
-						transform.Data = append(transform.Data, sum)
-					} else {
-						transform.Data = append(transform.Data, s[index])
-						index++
-					}
-				}
-			}
-			in := NewMatrix(4, 1)
-			for k := 0; k < 4; k++ {
-				in.Data = append(in.Data, value.Measures[k])
-			}
-			out := transform.MulT(in)
-			input := others.ByName["input"].X
-			for j := range input {
-				input[j] = out.Data[j]
-			}
-			l2(func(a *tf64.V) bool {
-				samples.Data = append(samples.Data, a.X...)
-				return true
-			})
-		}
+		samples := Sample(value, &others, l2, rng)
+
 		average := make([]float64, samples.Cols)
 		for j := 0; j < iterations; j++ {
 			for k := 0; k < samples.Cols; k++ {

@@ -377,6 +377,7 @@ func main() {
 	)
 	correct = 0
 	correct1 := 0
+	correct2 := 0
 	for _, value := range iris {
 		samples := NewMatrix(3, iterations)
 		for j := 0; j < iterations; j++ {
@@ -473,7 +474,41 @@ func main() {
 		if index == Labels[value.Label] {
 			correct1++
 		}
+
+		average1 := make([]float64, sa.Cols)
+		for j := 0; j < iterations; j++ {
+			for k := 0; k < sa.Cols; k++ {
+				average1[k] += sa.Data[j*sa.Cols+k]
+			}
+		}
+		for j := range average1 {
+			average1[j] /= iterations
+		}
+		variance1 := make([]float64, sa.Cols)
+		for j := 0; j < iterations; j++ {
+			for k := 0; k < sa.Cols; k++ {
+				diff := average1[k] - sa.Data[j*sa.Cols+k]
+				variance1[k] += diff * diff
+			}
+		}
+		for j := range variance1 {
+			variance1[j] /= iterations
+			variance1[j] = math.Sqrt(variance1[j])
+		}
+
+		{
+			min, index := math.MaxFloat64, 0
+			for j, v := range variance1 {
+				if v < min {
+					min, index = v, j
+				}
+			}
+			if index == Labels[value.Label] {
+				correct2++
+			}
+		}
 	}
 	fmt.Println("raw correct", correct, float64(correct)/float64(len(iris)))
 	fmt.Println("self attention correct", correct1, float64(correct1)/float64(len(iris)))
+	fmt.Println("self attention variance correct", correct1, float64(correct1)/float64(len(iris)))
 }

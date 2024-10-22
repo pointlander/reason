@@ -70,6 +70,24 @@ func Dot(x, y []float64) (z float64) {
 	return z
 }
 
+// Add adds two float32 matrices
+func (m Matrix) Add(n Matrix) Matrix {
+	lena, lenb := len(m.Data), len(n.Data)
+	if lena%lenb != 0 {
+		panic(fmt.Errorf("%d %% %d != 0", lena, lenb))
+	}
+
+	o := Matrix{
+		Cols: m.Cols,
+		Rows: m.Rows,
+		Data: make([]float64, 0, m.Cols*m.Rows),
+	}
+	for i, value := range m.Data {
+		o.Data = append(o.Data, value+n.Data[i%lenb])
+	}
+	return o
+}
+
 // MulT multiplies two matrices and computes the transpose
 func (m Matrix) MulT(n Matrix) Matrix {
 	if m.Cols != n.Cols {
@@ -223,7 +241,7 @@ const (
 )
 
 // Sample samples the neural network
-func Sample(value Fisher, others *tf64.Set, l2 tf64.Meta, rng *rand.Rand) Matrix {
+func Sample(stddev []float64, value Fisher, others *tf64.Set, l2 tf64.Meta, rng *rand.Rand) Matrix {
 	samples := NewMatrix(3, iterations)
 	for j := 0; j < iterations; j++ {
 		transform := NewMatrix(4, 4)
@@ -231,7 +249,7 @@ func Sample(value Fisher, others *tf64.Set, l2 tf64.Meta, rng *rand.Rand) Matrix
 			sum := 1.0
 			s := make([]float64, 3)
 			for l := range s {
-				v := rng.NormFloat64() / 8
+				v := rng.NormFloat64() * stddev[l]
 				sum -= v
 				s[l] = v
 			}
@@ -265,7 +283,43 @@ func Sample(value Fisher, others *tf64.Set, l2 tf64.Meta, rng *rand.Rand) Matrix
 func main() {
 	rng := rand.New(rand.NewSource(1))
 	iris := Load()
-
+	stddev := make([]float64, 4)
+	{
+		min, max := math.MaxFloat64, 0.0
+		for _, value := range iris {
+			for _, v := range value.Measures {
+				if v < min {
+					min = v
+				}
+				if v > max {
+					max = v
+				}
+			}
+		}
+		sum := make([]float64, 4)
+		scale := max - min
+		for _, value := range iris {
+			for i, v := range value.Measures {
+				vv := (v - min) / scale
+				value.Measures[i] = vv
+				sum[i] += vv
+			}
+		}
+		for i := range sum {
+			sum[i] /= float64(len(iris))
+		}
+		for _, value := range iris {
+			for i, v := range value.Measures {
+				diff := v - sum[i]
+				stddev[i] += diff * diff
+			}
+		}
+		for i := range stddev {
+			stddev[i] /= float64(len(iris))
+			stddev[i] = math.Sqrt(stddev[i])
+		}
+	}
+	fmt.Println("stddev", stddev)
 	set := tf64.NewSet()
 	set.Add("w1", 4, 4)
 	set.Add("b1", 4)
@@ -420,9 +474,9 @@ func main() {
 	correct1 := 0
 	correct2 := 0
 	for _, value := range iris {
-		samples := Sample(value, &others, l2, rng)
-		samples1 := Sample(value, &others, l2, rng)
-		samples2 := Sample(value, &others, l2, rng)
+		samples := Sample(stddev, value, &others, l2, rng)
+		samples1 := Sample(stddev, value, &others, l2, rng)
+		samples2 := Sample(stddev, value, &others, l2, rng)
 
 		average := make([]float64, samples.Cols)
 		for j := 0; j < iterations; j++ {

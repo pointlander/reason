@@ -373,7 +373,7 @@ func main() {
 	fmt.Println("correct", correct, float64(correct)/float64(len(iris)))
 
 	const (
-		iterations = 1024
+		iterations = 2 * 1024
 	)
 	correct = 0
 	correct1 := 0

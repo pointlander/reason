@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alixaxel/pagerank"
 	"github.com/pointlander/gradient/tf64"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
@@ -143,30 +144,47 @@ func softmax(values []float64) {
 	}
 }
 
-// SelfAttention computes the self attention of Q, K, V
-func SelfAttention(Q, K, V Matrix) Matrix {
+// SelfAttention computes the page rank of x, y, z
+func SelfAttention(x, y, z Matrix) (Matrix, []float64) {
 	o := Matrix{
-		Cols: V.Cols,
-		Rows: K.Rows,
-		Data: make([]float64, 0, V.Rows*K.Rows),
+		Cols: z.Cols,
+		Rows: y.Rows,
+		Data: make([]float64, 0, z.Rows*y.Rows),
 	}
-	outputs, values := make([]float64, V.Cols), make([]float64, Q.Rows)
-	V = V.T()
-	for i := 0; i < K.Rows; i++ {
-		K := K.Data[i*K.Cols : (i+1)*K.Cols]
-		for j := 0; j < Q.Rows; j++ {
-			Q := Q.Data[j*Q.Cols : (j+1)*Q.Cols]
-			values[j] = Dot(K, Q)
+	outputs, values := make([]float64, z.Cols), make([]float64, x.Rows)
+	z = z.T()
+	graph := pagerank.NewGraph()
+	for i := 0; i < y.Rows; i++ {
+		yy := y.Data[i*y.Cols : (i+1)*y.Cols]
+		aa := 0.0
+		for _, v := range yy {
+			aa += v * v
+		}
+		aa = math.Sqrt(float64(aa))
+		for j := 0; j < x.Rows; j++ {
+			xx := x.Data[j*x.Cols : (j+1)*x.Cols]
+			bb := 0.0
+			for _, v := range xx {
+				bb += v * v
+			}
+			bb = math.Sqrt(bb)
+			values[j] = Dot(yy, xx)
+			d := math.Abs(values[j] / (aa * bb))
+			graph.Link(uint32(i), uint32(j), d)
 		}
 		softmax(values)
 
-		for j := 0; j < V.Rows; j++ {
-			V := V.Data[j*V.Cols : (j+1)*V.Cols]
-			outputs[j] = Dot(values, V)
+		for j := 0; j < z.Rows; j++ {
+			zz := z.Data[j*z.Cols : (j+1)*z.Cols]
+			outputs[j] = Dot(values, zz)
 		}
 		o.Data = append(o.Data, outputs...)
 	}
-	return o
+	ranks := make([]float64, y.Rows)
+	graph.Rank(1.0, 1e-3, func(node uint32, rank float64) {
+		ranks[node] = rank
+	})
+	return o, ranks
 }
 
 //go:embed iris.zip
@@ -473,6 +491,7 @@ func main() {
 	correct = 0
 	correct1 := 0
 	correct2 := 0
+	correct3 := 0
 	for _, value := range iris {
 		samples := Sample(stddev, value, &others, l2, rng)
 		samples1 := Sample(stddev, value, &others, l2, rng)
@@ -517,7 +536,24 @@ func main() {
 			return true
 		})
 
-		sa := SelfAttention(samples, samples1, samples2)
+		sa, ranks := SelfAttention(samples, samples1, samples2)
+		sums := make([]float64, sa.Cols)
+		for j := 0; j < sa.Rows; j++ {
+			for k := 0; k < sa.Cols; k++ {
+				sums[k] += ranks[j] * sa.Data[j*sa.Cols+k]
+			}
+		}
+		{
+			max, index := 0.0, 0
+			for i, v := range sums {
+				if v > max {
+					max, index = v, i
+				}
+			}
+			if index == Labels[value.Label] {
+				correct3++
+			}
+		}
 		votes := make([]int, sa.Cols)
 		for j := 0; j < sa.Rows; j++ {
 			max, index := 0.0, 0
@@ -574,5 +610,6 @@ func main() {
 	}
 	fmt.Println("raw correct", correct, float64(correct)/float64(len(iris)))
 	fmt.Println("self attention correct", correct1, float64(correct1)/float64(len(iris)))
-	fmt.Println("self attention variance correct", correct1, float64(correct1)/float64(len(iris)))
+	fmt.Println("self attention variance correct", correct2, float64(correct2)/float64(len(iris)))
+	fmt.Println("self attention page rank", correct3, float64(correct3)/float64(len(iris)))
 }

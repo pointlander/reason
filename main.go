@@ -608,8 +608,8 @@ func main() {
 			}
 		}
 	}
-	fmt.Println("raw correct", correct, float64(correct)/float64(len(iris)))
+	fmt.Println("variance correct", correct, float64(correct)/float64(len(iris)))
 	fmt.Println("self attention correct", correct1, float64(correct1)/float64(len(iris)))
 	fmt.Println("self attention variance correct", correct2, float64(correct2)/float64(len(iris)))
-	fmt.Println("self attention page rank", correct3, float64(correct3)/float64(len(iris)))
+	fmt.Println("self attention page rank correct", correct3, float64(correct3)/float64(len(iris)))
 }

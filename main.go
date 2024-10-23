@@ -267,7 +267,7 @@ func Sample(stddev []float64, value Fisher, others *tf64.Set, l2 tf64.Meta, rng 
 			sum := 1.0
 			s := make([]float64, 3)
 			for l := range s {
-				v := rng.NormFloat64() * stddev[l]
+				v := rng.NormFloat64() * stddev[l] / 2
 				sum -= v
 				s[l] = v
 			}

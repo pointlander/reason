@@ -339,9 +339,9 @@ func main() {
 	}
 	fmt.Println("stddev", stddev)
 	set := tf64.NewSet()
-	set.Add("w1", 4, 4)
-	set.Add("b1", 4)
-	set.Add("w2", 4, 3)
+	set.Add("w1", 4, 8)
+	set.Add("b1", 8)
+	set.Add("w2", 8, 3)
 	set.Add("b2", 3)
 
 	for i := range set.Weights {

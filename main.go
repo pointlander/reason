@@ -350,20 +350,20 @@ func Kalman() {
 
 	// define LTI system
 	lti := lti.Discrete{
-		Ad: mat.NewDense(1, 1, []float64{1}),
-		Bd: mat.NewDense(1, 1, nil),
-		C:  mat.NewDense(1, 1, []float64{1}),
-		D:  mat.NewDense(1, 1, nil),
+		Ad: mat.NewDense(2, 2, []float64{1, 0, 0, 1}),
+		Bd: mat.NewDense(2, 2, nil),
+		C:  mat.NewDense(2, 2, []float64{1, 0, 0, 1}),
+		D:  mat.NewDense(2, 2, nil),
 	}
 
 	// system noise / process model covariance matrix ("Systemrauschen")
-	Gd := mat.NewDense(1, 1, []float64{1})
+	Gd := mat.NewDense(2, 2, []float64{1, 0, 0, 1})
 
 	ctx := kalman.Context{
 		// initial state
-		X: mat.NewVecDense(1, []float64{y[0]}),
+		X: mat.NewVecDense(2, []float64{y[0], 2 * y[0]}),
 		// initial covariance matrix
-		P: mat.NewDense(1, 1, []float64{0}),
+		P: mat.NewDense(2, 2, []float64{0, 0, 0, 0}),
 	}
 
 	// create ROSE filter
@@ -373,13 +373,13 @@ func Kalman() {
 	filter := kalman.NewRoseFilter(lti, Gd, gammaR, alphaR, alphaM)
 
 	// no control
-	u := mat.NewVecDense(1, nil)
+	u := mat.NewVecDense(2, nil)
 
 	points := make(plotter.XYs, 0, 8)
 	points1 := make(plotter.XYs, 0, 8)
 	for i, row := range y {
 		// new measurement
-		y := mat.NewVecDense(1, []float64{row})
+		y := mat.NewVecDense(2, []float64{row, y[len(y)-1-i]})
 
 		// apply filter
 		filter.Apply(&ctx, y, u)

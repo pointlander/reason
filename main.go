@@ -9,7 +9,9 @@ import (
 	"bytes"
 	"embed"
 	"encoding/csv"
+	"flag"
 	"fmt"
+	"image/color"
 	"io"
 	"math"
 	"math/rand"
@@ -17,7 +19,10 @@ import (
 	"strings"
 
 	"github.com/alixaxel/pagerank"
+	"github.com/konimarti/kalman"
+	"github.com/konimarti/lti"
 	"github.com/pointlander/gradient/tf64"
+	"gonum.org/v1/gonum/mat"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
@@ -298,7 +303,139 @@ func Sample(stddev []float64, value Fisher, others *tf64.Set, l2 tf64.Meta, rng 
 	return samples
 }
 
+//go:embed p133.csv
+var rose embed.FS
+
+func load() [][]float64 {
+	file, err := rose.Open("p133.csv")
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	r := csv.NewReader(file)
+	r.Comma = ','
+
+	lines, err := r.ReadAll()
+	if err != nil {
+		panic("could read data from file")
+	}
+
+	y := make([][]float64, len(lines))
+	for row, line := range lines {
+		tmp := make([]float64, len(line))
+		for i, entry := range line {
+			var value float64
+			if value, err = strconv.ParseFloat(entry, 64); err != nil {
+				fmt.Println("error parsing", line, i, entry)
+				panic("could not parse all values")
+			}
+			tmp[i] = value
+		}
+		y[row] = tmp
+	}
+	return y
+}
+
+var colors = [...]color.RGBA{
+	{R: 0xff, G: 0x00, B: 0x00, A: 255},
+	{R: 0x00, G: 0xff, B: 0x00, A: 255},
+	{R: 0x00, G: 0x00, B: 0xff, A: 255},
+}
+
+// Kalman is the kalman mode
+func Kalman() {
+	// load data
+	y := load()[0]
+
+	// define LTI system
+	lti := lti.Discrete{
+		Ad: mat.NewDense(1, 1, []float64{1}),
+		Bd: mat.NewDense(1, 1, nil),
+		C:  mat.NewDense(1, 1, []float64{1}),
+		D:  mat.NewDense(1, 1, nil),
+	}
+
+	// system noise / process model covariance matrix ("Systemrauschen")
+	Gd := mat.NewDense(1, 1, []float64{1})
+
+	ctx := kalman.Context{
+		// initial state
+		X: mat.NewVecDense(1, []float64{y[0]}),
+		// initial covariance matrix
+		P: mat.NewDense(1, 1, []float64{0}),
+	}
+
+	// create ROSE filter
+	gammaR := 9.0
+	alphaR := 0.5
+	alphaM := 0.3
+	filter := kalman.NewRoseFilter(lti, Gd, gammaR, alphaR, alphaM)
+
+	// no control
+	u := mat.NewVecDense(1, nil)
+
+	points := make(plotter.XYs, 0, 8)
+	points1 := make(plotter.XYs, 0, 8)
+	for i, row := range y {
+		// new measurement
+		y := mat.NewVecDense(1, []float64{row})
+
+		// apply filter
+		filter.Apply(&ctx, y, u)
+
+		// get corrected state vector
+		state := filter.State()
+
+		// print out input and output signals
+		//fmt.Fprintf(file, "%3.8f,%3.8f\n", y.AtVec(0), state.AtVec(0))
+		points = append(points, plotter.XY{X: float64(i), Y: float64(y.AtVec(0))})
+		points1 = append(points1, plotter.XY{X: float64(i), Y: float64(state.AtVec(0))})
+	}
+
+	p := plot.New()
+
+	p.Title.Text = "iteration vs value"
+	p.X.Label.Text = "iteration"
+	p.Y.Label.Text = "value"
+
+	scatter, err := plotter.NewScatter(points)
+	if err != nil {
+		panic(err)
+	}
+	scatter.GlyphStyle.Radius = vg.Length(1)
+	scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+	scatter.GlyphStyle.Color = colors[0]
+	p.Add(scatter)
+
+	scatter, err = plotter.NewScatter(points1)
+	if err != nil {
+		panic(err)
+	}
+	scatter.GlyphStyle.Radius = vg.Length(1)
+	scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+	scatter.GlyphStyle.Color = colors[1]
+	p.Add(scatter)
+
+	err = p.Save(8*vg.Inch, 8*vg.Inch, "values.png")
+	if err != nil {
+		panic(err)
+	}
+}
+
+var (
+	// FlagKalman is the kalman filter mode
+	FlagKalman = flag.Bool("kalman", false, "kalman mode")
+)
+
 func main() {
+	flag.Parse()
+
+	if *FlagKalman {
+		Kalman()
+		return
+	}
+
 	rng := rand.New(rand.NewSource(1))
 	iris := Load()
 	stddev := make([]float64, 4)

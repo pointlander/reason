@@ -378,6 +378,7 @@ func Kalman() {
 
 	points := make(plotter.XYs, 0, 8)
 	points1 := make(plotter.XYs, 0, 8)
+	data := NewMatrix(2, 1024)
 	for i := 0; i < 1024; i++ {
 		// new measurement
 		a, b := 1.0, 0.0
@@ -394,12 +395,21 @@ func Kalman() {
 
 		// get corrected state vector
 		state := filter.State()
-		fmt.Println(ctx.P)
+		s := NewMatrix(2, 2, ctx.P.RawMatrix().Data...)
+		sa, _ := SelfAttention(s, s, s)
+		data.Data = append(data.Data, sa.Data[0]+sa.Data[2], sa.Data[1]+sa.Data[3])
 
 		// print out input and output signals
 		//fmt.Fprintf(file, "%3.8f,%3.8f\n", y.AtVec(0), state.AtVec(0))
 		points = append(points, plotter.XY{X: float64(i), Y: float64(y.AtVec(0))})
 		points1 = append(points1, plotter.XY{X: float64(i), Y: float64(state.AtVec(0))})
+	}
+
+	for i := 0; i < data.Rows; i++ {
+		for j := 0; j < data.Cols; j++ {
+			fmt.Printf("%f ", data.Data[i*data.Cols+j])
+		}
+		fmt.Println()
 	}
 
 	p := plot.New()

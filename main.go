@@ -346,7 +346,8 @@ var colors = [...]color.RGBA{
 // Kalman is the kalman mode
 func Kalman() {
 	// load data
-	y := load()[0]
+	//y := load()[0]
+	state := 0
 
 	// define LTI system
 	lti := lti.Discrete{
@@ -361,7 +362,7 @@ func Kalman() {
 
 	ctx := kalman.Context{
 		// initial state
-		X: mat.NewVecDense(2, []float64{y[0], 2 * y[0]}),
+		X: mat.NewVecDense(2, []float64{1, 0}),
 		// initial covariance matrix
 		P: mat.NewDense(2, 2, []float64{0, 0, 0, 0}),
 	}
@@ -377,15 +378,23 @@ func Kalman() {
 
 	points := make(plotter.XYs, 0, 8)
 	points1 := make(plotter.XYs, 0, 8)
-	for i, row := range y {
+	for i := 0; i < 1024; i++ {
 		// new measurement
-		y := mat.NewVecDense(2, []float64{row, y[len(y)-1-i]})
+		a, b := 1.0, 0.0
+		if state == 0 {
+			state = 1
+		} else {
+			a, b = 0, 1
+			state = 0
+		}
+		y := mat.NewVecDense(2, []float64{a, b})
 
 		// apply filter
 		filter.Apply(&ctx, y, u)
 
 		// get corrected state vector
 		state := filter.State()
+		fmt.Println(ctx.P)
 
 		// print out input and output signals
 		//fmt.Fprintf(file, "%3.8f,%3.8f\n", y.AtVec(0), state.AtVec(0))

@@ -378,8 +378,8 @@ func Kalman() {
 
 	points := make(plotter.XYs, 0, 8)
 	points1 := make(plotter.XYs, 0, 8)
-	data := NewMatrix(2, 1024)
-	for i := 0; i < 1024; i++ {
+	data := NewMatrix(2, 128)
+	for i := 0; i < 128; i++ {
 		// new measurement
 		a, b := 1.0, 0.0
 		if state == 0 {

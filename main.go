@@ -444,6 +444,19 @@ func Kalman() {
 	}
 
 	{
+		min, max := math.MaxFloat64, 0.0
+		for _, v := range data.Data {
+			if v > max {
+				max = v
+			}
+			if v < min {
+				v = min
+			}
+		}
+		scale := max - min
+		for i, v := range data.Data {
+			data.Data[i] = (v - min) / scale
+		}
 		rng := rand.New(rand.NewSource(1))
 		set := tf64.NewSet()
 		set.Add("w1", 2, 8)

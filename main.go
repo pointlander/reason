@@ -379,6 +379,7 @@ func Kalman() {
 	points := make(plotter.XYs, 0, 8)
 	points1 := make(plotter.XYs, 0, 8)
 	data := NewMatrix(2, 128)
+	inputs := NewMatrix(2, 128)
 	for i := 0; i < 128; i++ {
 		// new measurement
 		a, b := 1.0, 0.0
@@ -389,6 +390,7 @@ func Kalman() {
 			state = 0
 		}
 		y := mat.NewVecDense(2, []float64{a, b})
+		inputs.Data = append(inputs.Data, a, b)
 
 		// apply filter
 		filter.Apply(&ctx, y, u)
@@ -439,6 +441,137 @@ func Kalman() {
 	err = p.Save(8*vg.Inch, 8*vg.Inch, "values.png")
 	if err != nil {
 		panic(err)
+	}
+
+	{
+		rng := rand.New(rand.NewSource(1))
+		set := tf64.NewSet()
+		set.Add("w1", 2, 8)
+		set.Add("b1", 8)
+		set.Add("w2", 8, 2)
+		set.Add("b2", 2)
+
+		for i := range set.Weights {
+			w := set.Weights[i]
+			if strings.HasPrefix(w.N, "b") {
+				w.X = w.X[:cap(w.X)]
+				w.States = make([][]float64, StateTotal)
+				for i := range w.States {
+					w.States[i] = make([]float64, len(w.X))
+				}
+				continue
+			}
+			factor := math.Sqrt(float64(w.S[0]))
+			for i := 0; i < cap(w.X); i++ {
+				w.X = append(w.X, rng.NormFloat64()*factor)
+			}
+			w.States = make([][]float64, StateTotal)
+			for i := range w.States {
+				w.States[i] = make([]float64, len(w.X))
+			}
+		}
+
+		others := tf64.NewSet()
+		others.Add("input", 2)
+		others.Add("output", 2)
+
+		for i := range others.Weights {
+			w := others.Weights[i]
+			w.X = w.X[:cap(w.X)]
+		}
+
+		l1 := tf64.Sigmoid(tf64.Add(tf64.Mul(set.Get("w1"), others.Get("input")), set.Get("b1")))
+		l2 := tf64.Sigmoid(tf64.Add(tf64.Mul(set.Get("w2"), l1), set.Get("b2")))
+		loss := tf64.Quadratic(l2, others.Get("output"))
+
+		points := make(plotter.XYs, 0, 8)
+		for i := 0; i < 33*data.Rows; i++ {
+			pow := func(x float64) float64 {
+				y := math.Pow(x, float64(i+1))
+				if math.IsNaN(y) || math.IsInf(y, 0) {
+					return 0
+				}
+				return y
+			}
+
+			others.Zero()
+			index := rng.Intn(inputs.Rows)
+			input := others.ByName["input"].X
+			for j := range input {
+				input[j] = inputs.Data[index*inputs.Cols+j]
+			}
+			output := others.ByName["output"].X
+			for j := range output {
+				output[j] = data.Data[index*data.Cols+j]
+			}
+
+			set.Zero()
+			cost := tf64.Gradient(loss).X[0]
+
+			norm := 0.0
+			for _, p := range set.Weights {
+				for _, d := range p.D {
+					norm += d * d
+				}
+			}
+			norm = math.Sqrt(norm)
+			b1, b2 := pow(B1), pow(B2)
+			if norm > 1 {
+				scaling := 1 / norm
+				for _, w := range set.Weights {
+					for l, d := range w.D {
+						g := d * scaling
+						m := B1*w.States[StateM][l] + (1-B1)*g
+						v := B2*w.States[StateV][l] + (1-B2)*g*g
+						w.States[StateM][l] = m
+						w.States[StateV][l] = v
+						mhat := m / (1 - b1)
+						vhat := v / (1 - b2)
+						if vhat < 0 {
+							vhat = 0
+						}
+						w.X[l] -= Eta * mhat / (math.Sqrt(vhat) + 1e-8)
+					}
+				}
+			} else {
+				for _, w := range set.Weights {
+					for l, d := range w.D {
+						g := d
+						m := B1*w.States[StateM][l] + (1-B1)*g
+						v := B2*w.States[StateV][l] + (1-B2)*g*g
+						w.States[StateM][l] = m
+						w.States[StateV][l] = v
+						mhat := m / (1 - b1)
+						vhat := v / (1 - b2)
+						if vhat < 0 {
+							vhat = 0
+						}
+						w.X[l] -= Eta * mhat / (math.Sqrt(vhat) + 1e-8)
+					}
+				}
+			}
+
+			points = append(points, plotter.XY{X: float64(i), Y: float64(cost)})
+		}
+
+		p = plot.New()
+
+		p.Title.Text = "epochs vs cost"
+		p.X.Label.Text = "epochs"
+		p.Y.Label.Text = "cost"
+
+		scatter, err := plotter.NewScatter(points)
+		if err != nil {
+			panic(err)
+		}
+		scatter.GlyphStyle.Radius = vg.Length(1)
+		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+		p.Add(scatter)
+
+		err = p.Save(8*vg.Inch, 8*vg.Inch, "epochs_kalman.png")
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 

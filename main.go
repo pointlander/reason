@@ -511,11 +511,11 @@ func Kalman() {
 			index := rng.Intn(inputs.Rows)
 			input := others.ByName["input"].X
 			for j := range input {
-				input[j] = inputs.Data[index*inputs.Cols+j]
+				input[j] = data.Data[index*inputs.Cols+j]
 			}
 			output := others.ByName["output"].X
 			for j := range output {
-				output[j] = data.Data[index*data.Cols+j]
+				output[j] = inputs.Data[index*data.Cols+j]
 			}
 
 			set.Zero()

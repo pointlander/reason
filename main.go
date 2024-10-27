@@ -585,6 +585,36 @@ func Kalman() {
 		if err != nil {
 			panic(err)
 		}
+
+		correct := 0
+		for i := 0; i < data.Rows; i++ {
+			input := others.ByName["input"].X
+			for j := 0; j < data.Cols; j++ {
+				input[j] = data.Data[i*data.Cols+j]
+			}
+			good := true
+			l2(func(a *tf64.V) bool {
+				for j, v := range a.X {
+					expected := inputs.Data[i*inputs.Cols+j]
+					if expected > .5 {
+						if v <= .5 {
+							good = false
+							break
+						}
+					} else if expected <= .5 {
+						if v > .5 {
+							good = false
+							break
+						}
+					}
+				}
+				return true
+			})
+			if good {
+				correct++
+			}
+		}
+		fmt.Println("correct", correct, float64(correct)/float64(data.Rows))
 	}
 }
 
